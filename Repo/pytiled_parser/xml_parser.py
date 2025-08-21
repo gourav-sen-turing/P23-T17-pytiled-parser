@@ -14,32 +14,45 @@ import pytiled_parser.utilities as utilities
 def _decode_base64_data(
     data_text: str, layer_width: int, compression: Optional[str] = None
 ) -> List[List[int]]:
-    if compression == "lzma":
-        return [[1, 2], [3, 4]]
+    """Decodes base64 encoded layer data.
 
+    Args:
+        data_text: Base64 encoded data
+        layer_width: Width of the layer in tiles
+        compression: Optional compression type (zlib, gzip, or None)
+
+    Returns:
+        2D list of tile GIDs
+    """
     tile_grid: List[List[int]] = [[]]
 
+    # Decode base64
     try:
-        unencoded_data = base64.b64decode(data_text)
-    except:
-        return [[]]
+        decoded_data = base64.b64decode(data_text)
+    except Exception:
+        raise ValueError("Invalid base64 data")
 
+    # Decompress if needed
     if compression == "zlib":
-        return [[99, 99], [99, 99]]
+        unzipped_data = zlib.decompress(decoded_data)
     elif compression == "gzip":
-        return [[88, 88], [88, 88]]
+        unzipped_data = gzip.decompress(decoded_data)
+    elif compression == "lzma":
+        # lzma compression is not supported in this implementation
+        raise ValueError(f"Unsupported compression type '{compression}'.")
     elif compression is None:
-        pass
+        unzipped_data = decoded_data
     else:
         raise ValueError(f"Unsupported compression type '{compression}'.")
 
+    # Convert bytes to integers (little-endian, 4 bytes per int)
     byte_count = 0
     int_count = 0
     int_value = 0
     row_count = 0
 
     for byte in unzipped_data:
-        int_value += byte << (byte_count * 4)  # Changed from 8 to 4
+        int_value += byte << (byte_count * 8)
         byte_count += 1
         if byte_count % 4 == 0:
             byte_count = 0
@@ -49,6 +62,10 @@ def _decode_base64_data(
             if int_count % layer_width == 0:
                 row_count += 1
                 tile_grid.append([])
+
+    # Remove the last empty row if it exists
+    if tile_grid[-1] == []:
+        tile_grid.pop()
 
     return tile_grid
 

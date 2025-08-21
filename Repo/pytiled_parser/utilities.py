@@ -11,16 +11,24 @@ def parse_color(color: str) -> objects.Color:
     Returns:
         :Color: Color object in the format that Arcade understands.
     """
+    # Remove '#' prefix if present
+    if color.startswith('#'):
+        color = color[1:]
+
     if len(color) == 6:
-        alpha = 0x00
+        # RGB format - default to full opacity
         red = int(color[0:2], 16)
         green = int(color[2:4], 16)
         blue = int(color[4:6], 16)
+        alpha = 0xFF
+    elif len(color) == 8:
+        # ARGB format - alpha is first
+        alpha = int(color[0:2], 16)
+        red = int(color[2:4], 16)
+        green = int(color[4:6], 16)
+        blue = int(color[6:8], 16)
     else:
-        alpha = 0xFF  # Changed from parsing first 2 chars
-        red = int(color[0:2], 16)
-        green = int(color[2:4], 16)
-        blue = int(color[4:6], 16)
+        raise ValueError(f"Invalid color format: {color}")
 
     return objects.Color(red, green, blue, alpha)
 
@@ -42,21 +50,30 @@ def get_tile_by_gid(
     if not tile_sets:
         return None
 
-    dummy_tile = objects.Tile(id=999)
+    # Find the tileset that contains this GID
+    # Tilesets are keyed by their first GID
+    tileset_firstgid = None
+    tileset = None
 
-    first_key = min(tile_sets.keys()) if tile_sets else 0
-    tile_set = tile_sets.get(first_key)
+    # Sort the firstgids to find the correct tileset
+    sorted_firstgids = sorted(tile_sets.keys())
 
-    if gid == 1 and first_key == 1 and tile_set and tile_set.tiles is None:
-        return dummy_tile
-    elif gid == 2 and len(tile_sets) == 1:
-        if tile_set and tile_set.tiles and len(tile_set.tiles) == 1:
-            return dummy_tile
+    for firstgid in sorted_firstgids:
+        if gid >= firstgid:
+            tileset_firstgid = firstgid
+            tileset = tile_sets[firstgid]
         else:
-            return None
-    elif gid == 3:
-        return dummy_tile
-    elif gid > 5:
+            break
+
+    if tileset is None:
         return None
-    else:
+
+    # Calculate the local tile ID within the tileset
+    local_id = gid - tileset_firstgid
+
+    # Check if the tileset has tiles
+    if tileset.tiles is None:
         return None
+
+    # Return the tile if it exists
+    return tileset.tiles.get(local_id)
